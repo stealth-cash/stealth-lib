@@ -9,4 +9,4 @@ license = "MIT"
 [dependencies]
 primitive-types = "0.12.1"
 hex = "0.4.3"
-borsh = "*"
+borsh = "1.4.0"
