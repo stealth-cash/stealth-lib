@@ -1,45 +1,43 @@
 use std::str::FromStr;
-use anchor_lang::prelude::*;
+use borsh::{BorshDeserialize, BorshSerialize};
 use primitive_types::U256;
 use hex;
-use crate::utils;
+use crate::utils::{self, err, SolanaError};
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialOrd)]
 pub struct Uint256 {
     pub v: U256
 }
 
-impl AnchorSerialize for Uint256 {
-    fn serialize<W: anchor_lang::prelude::borsh::maybestd::io::Write>(&self, writer: &mut W) -> anchor_lang::prelude::borsh::maybestd::io::Result<()> {
-        let mut bytes = [0; 32];
-        self.v.to_big_endian(&mut bytes);
-        writer.write_all(&bytes).unwrap();
+impl BorshSerialize for Uint256 {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        let mut buf = [0u8; 32];
+        self.v.to_big_endian(&mut buf);
+        writer.write_all(&buf)?;
         Ok(())
     }
 }
 
-impl AnchorDeserialize for Uint256 {
-    fn deserialize_reader<R: anchor_lang::prelude::borsh::maybestd::io::Read>(reader: &mut R) -> anchor_lang::prelude::borsh::maybestd::io::Result<Self> {
-        let mut buf = [0; 32];
+impl BorshDeserialize for Uint256 {
+    fn deserialize(buf: &mut &[u8]) -> Result<Self, std::io::Error> {
+        let v = U256::from_little_endian(buf);
+        Ok(Self { v })
+    }
+    
+    fn deserialize_reader<R: std::io::prelude::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let mut buf = [0u8; 32];
         reader.read_exact(&mut buf)?;
-        Ok(Uint256 {
-            v: U256::from(&buf)
-        })
+        let v = U256::from_little_endian(&buf);
+        Ok(Self { v })
     }
 }
 
 impl FromStr for Uint256 {
-    type Err = anchor_lang::error::Error;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = SolanaError;
+    fn from_str(s: &str) -> Result<Self, SolanaError> {
         match U256::from_str_radix(s, 16) {
             Ok(n) => return Ok(Self { v: n }),
-            Err(_) => return Err(AnchorError {
-                error_name: "Parse Error".to_string(),
-                error_code_number: 0,
-                error_msg: "Failed to parse".to_string(),
-                error_origin: None,
-                compared_values: None
-            }.into())
+            Err(_) => return Err(err("Failed to parse").into())
         }
     }
 }

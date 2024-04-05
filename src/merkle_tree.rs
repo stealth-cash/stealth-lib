@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::str::FromStr;
-use anchor_lang::prelude::*;
 
 use crate::{hasher::Hasher, uint256::Uint256};
-use crate::utils;
+use crate::utils::{self, SolanaError};
 
 pub const ROOT_HISTORY_SIZE: u8 = 30;
 
@@ -40,9 +39,9 @@ impl ToString for MerkleTree {
 }
 
 impl FromStr for MerkleTree {
-    type Err = AnchorError;
+    type Err = SolanaError;
 
-    fn from_str(s: &str) -> std::result::Result<Self, AnchorError> {
+    fn from_str(s: &str) -> std::result::Result<Self, SolanaError> {
         let mut levels: Option<u8> = None;
         let mut filled_subtrees: HashMap<u8, Uint256> = HashMap::new();
         let mut roots: HashMap<u8, Uint256> = HashMap::new();
@@ -87,7 +86,7 @@ impl FromStr for MerkleTree {
                     next_index = Some(value.parse().map_err(|e| format!("Parsing next_index failed: {}", e)).unwrap());
                 }
                 _ => {
-                    return Err(utils::err("Unexpecte error").into());
+                    return Err(utils::err("Unexpected error").into());
                 }
             }
         }
@@ -137,7 +136,7 @@ impl MerkleTree {
         r
     }
 
-    pub fn insert(&mut self, leaf: Uint256) -> Result<u8> {
+    pub fn insert(&mut self, leaf: Uint256) -> Result<u8, SolanaError> {
         if self.next_index < 2_u8.pow(self.levels as u32) {
             return Err(utils::err("Merkle tree is full, no more leaves can be added").into());
         }
