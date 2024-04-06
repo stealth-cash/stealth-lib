@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use cosmwasm_std::Uint256;
+
 use crate::hasher::Hasher;
 use crate::utils::{self, SolanaError};
 
@@ -26,10 +28,10 @@ impl MerkleTree {
         };
 
         for i in 0..levels {
-            instance.filled_subtrees.insert(i, zeros(i));
+            instance.filled_subtrees.insert(i, Self::zeros(i));
         }
 
-        instance.roots.insert(0, zeros(levels - 1));
+        instance.roots.insert(0, Self::zeros(levels - 1));
         instance
     }
 
@@ -38,13 +40,13 @@ impl MerkleTree {
     }
 
     pub fn hash_left_right(&self, left: Uint256, right: Uint256) -> Uint256 {
-        let field_size: Uint256 = Uint256::from("21888242871839275222246405745").expect("Failed to parse field size");
+        let field_size: Uint256 = Uint256::from_str("21888242871839275222246405745257275088548364400416034343698204186575808495617").expect("Failed to parse field size");
 
         let mut r = left;
-        let c = Uint256::new(0);
+        let c = Uint256::zero();
 
         r = Hasher::mimc_sponge(&r, &c, &field_size);        
-        r = r.add_mod(&right, &field_size);
+        r = r.checked_add(right).unwrap() % field_size;
         r = Hasher::mimc_sponge(&r, &c, &field_size);
 
         r
@@ -64,7 +66,7 @@ impl MerkleTree {
         for i in 0..self.levels {
             if current_index % 2 == 0 {
                 left = current_level_hash.clone();
-                right = zeros(i);
+                right = Self::zeros(i);
                 self.filled_subtrees.insert(i, current_level_hash.clone());
             } else {
                 left = self.filled_subtrees.get(&i).unwrap().clone();
@@ -108,6 +110,18 @@ impl MerkleTree {
 
     pub fn get_last_root(&self) -> Uint256 {
         return self.roots.get(&self.current_root_index).unwrap().clone();
+    }
+
+    pub fn zeros(i: u8) -> Uint256 {
+        let mut result = Uint256::from_u128(0);
+        for _ in 0..i {
+            result = Hasher::mimc_sponge(
+                &result, 
+                &Uint256::zero(),
+                &Uint256::from_str("21888242871839275222246405745257275088548364400416034343698204186575808495617").expect("Failed to parse field size")
+            );
+        }
+        result
     }
 }
 
@@ -209,7 +223,7 @@ mod tests {
     #[test]
     fn test_insert() {
         let mut merkle_tree = MerkleTree::new(MERKLE_TREE_HEIGHT);
-        let leaf = Uint256::new(123);
+        let leaf = Uint256::from_u128(123);
         let result = merkle_tree.insert(leaf);
         assert!(result.is_ok());
     }
@@ -217,21 +231,8 @@ mod tests {
     #[test]
     fn test_is_known_root() {
         let merkle_tree = MerkleTree::new(MERKLE_TREE_HEIGHT);
-        let root = Uint256::new(123);
+        let root = Uint256::from_u128(123);
         let result = merkle_tree.is_known_root(root);
         assert_eq!(result, false);
     }
-
-}
-
-pub fn zeros(i: u8) -> Uint256 {
-    let mut result = Uint256::new(0);
-    for _ in 0..i {
-        result = Hasher::mimc_sponge(
-            &result, 
-            &Uint256::new(0),
-            &Uint256::from("21888242871839275").expect("Failed to parse field size")
-        );
-    }
-    result
 }
