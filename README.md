@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/stealth-lib.svg)](https://crates.io/crates/stealth-lib)
 [![Documentation](https://docs.rs/stealth-lib/badge.svg)](https://docs.rs/stealth-lib)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![CI](https://github.com/YOUR_USERNAME/stealth-lib/workflows/CI/badge.svg)](https://github.com/YOUR_USERNAME/stealth-lib/actions)
+[![CI](https://github.com/stealth-cash/stealth-lib/workflows/CI/badge.svg)](https://github.com/stealth-cash/stealth-lib/actions)
 
 ZK-friendly cryptographic primitives for Rust.
 

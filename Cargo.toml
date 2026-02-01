@@ -1,11 +1,11 @@
 [package]
 name = "stealth-lib"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 rust-version = "1.70"
 license = "MIT"
 description = "ZK-friendly cryptographic primitives (MiMC hash, Merkle trees)"
-repository = "https://github.com/YOUR_USERNAME/stealth-lib"
+repository = "https://github.com/stealth-cash/stealth-lib"
 documentation = "https://docs.rs/stealth-lib"
 readme = "README.md"
 keywords = ["cryptography", "merkle-tree", "zero-knowledge", "mimc", "zkp"]

@@ -11,11 +11,6 @@
 
 **Please DO NOT file public GitHub issues for security vulnerabilities.**
 
-### How to Report
-
-1. **Email**: Send details to `security@YOUR_DOMAIN.com`
-2. **GitHub Security Advisories**: Use the "Report a vulnerability" button on the Security tab
-
 ### What to Include
 
 - Description of the vulnerability
