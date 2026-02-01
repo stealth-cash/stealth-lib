@@ -1,12 +1,39 @@
 [package]
 name = "stealth-lib"
-version = "0.1.4"
+version = "1.0.0"
 edition = "2021"
-description = "Utility functions for ZKP"
+rust-version = "1.70"
 license = "MIT"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "ZK-friendly cryptographic primitives (MiMC hash, Merkle trees)"
+repository = "https://github.com/YOUR_USERNAME/stealth-lib"
+documentation = "https://docs.rs/stealth-lib"
+readme = "README.md"
+keywords = ["cryptography", "merkle-tree", "zero-knowledge", "mimc", "zkp"]
+categories = ["cryptography", "data-structures"]
+include = ["src/**/*", "Cargo.toml", "LICENSE", "README.md", "CHANGELOG.md"]
+
+[features]
+default = ["std"]
+std = []
+serde = ["dep:serde"]
+borsh = ["dep:borsh"]
+experimental = []
 
 [dependencies]
-primitive-types = "0.12.1"
 hex = "0.4.3"
-borsh = "1.4.0"
+
+# Optional dependencies
+serde = { version = "1.0", features = ["derive"], optional = true }
+borsh = { version = "1.4.0", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.4"
+
+[[bench]]
+name = "mimc"
+harness = false
+
+[[bench]]
+name = "merkle"
+harness = false

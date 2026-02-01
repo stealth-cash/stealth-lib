@@ -1,27 +1,63 @@
+//! Legacy Merkle tree module for backwards compatibility.
+//!
+//! # Deprecated
+//!
+//! This module is deprecated. Use [`crate::merkle::MerkleTree`] instead.
+//!
+//! ## Migration
+//!
+//! ```ignore
+//! // Old code:
+//! use stealth_lib::merkle_tree::MerkleTree;
+//! let tree = MerkleTree::new(20);
+//!
+//! // New code:
+//! use stealth_lib::MerkleTree;
+//! let tree = MerkleTree::new(20).unwrap();
+//! ```
+
+#![allow(missing_docs)]
+#![allow(deprecated)]
+
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use crate::{hasher::Hasher, utils::{self, SolanaError}};
+use crate::hash::MimcHasher;
+#[allow(deprecated)]
+use crate::utils::{self, SolanaError};
 
 pub const ROOT_HISTORY_SIZE: u8 = 30;
 
+/// Legacy MerkleTree implementation.
+///
+/// # Deprecated
+///
+/// Use [`crate::merkle::MerkleTree`] instead, which provides:
+/// - Proper error handling (no panics)
+/// - Proof generation and verification
+/// - Larger tree support (u32 indices instead of u8)
+#[deprecated(since = "1.0.0", note = "Use crate::merkle::MerkleTree instead")]
 #[derive(Debug, Clone)]
 pub struct MerkleTree {
     levels: u8,
     filled_subtrees: HashMap<u8, u128>,
     roots: HashMap<u8, u128>,
     current_root_index: u8,
-    next_index: u8
+    next_index: u8,
+    hasher: MimcHasher,
 }
 
+#[allow(deprecated)]
 impl MerkleTree {
     pub fn new(levels: u8) -> Self {
+        let hasher = MimcHasher::default();
         let mut instance = MerkleTree {
             levels,
             filled_subtrees: HashMap::new(),
             roots: HashMap::new(),
             current_root_index: 0,
-            next_index: 0
+            next_index: 0,
+            hasher,
         };
 
         for i in 0..levels {
@@ -37,37 +73,32 @@ impl MerkleTree {
     }
 
     pub fn hash_left_right(&self, left: u128, right: u128) -> u128 {
-        let field_size: u128 = u128::from_str("340282366920938463463374607431768211455").expect("Failed to parse field size");
-
-        let mut r = left;
+        let field_size = self.hasher.field_prime();
         let c = 0_u128;
 
-        r = Hasher::mimc_sponge(r, c, field_size);        
+        let mut r = left;
+        r = self.hasher.mimc_sponge(r, c, field_size);
         r = r.wrapping_add(right) % field_size;
-        r = Hasher::mimc_sponge(r, c, field_size);
+        r = self.hasher.mimc_sponge(r, c, field_size);
 
         r
     }
 
     pub fn insert(&mut self, leaf: u128) -> Result<u8, SolanaError> {
-        // if (self.next_index as usize) < 2_usize.pow(self.levels.into()) {
-        //     return Err(utils::err("Merkle tree is full, no more leaves can be added").into());
-        // }
-
         let _next_index = self.next_index;
         let mut current_index = self.next_index;
-        let mut current_level_hash = leaf.clone();
+        let mut current_level_hash = leaf;
         let mut left: u128;
         let mut right: u128;
 
         for i in 0..self.levels {
             if current_index % 2 == 0 {
-                left = current_level_hash.clone();
+                left = current_level_hash;
                 right = Self::zeros(i);
-                self.filled_subtrees.insert(i, current_level_hash.clone());
+                self.filled_subtrees.insert(i, current_level_hash);
             } else {
-                left = self.filled_subtrees.get(&i).unwrap().clone();
-                right = current_level_hash.clone();
+                left = *self.filled_subtrees.get(&i).unwrap_or(&Self::zeros(i));
+                right = current_level_hash;
             }
             current_level_hash = self.hash_left_right(left, right);
             current_index /= 2;
@@ -75,7 +106,7 @@ impl MerkleTree {
 
         let new_root_index: u8 = (self.current_root_index + 1) % ROOT_HISTORY_SIZE;
         self.current_root_index = new_root_index;
-        self.roots.insert(new_root_index, current_level_hash.clone());
+        self.roots.insert(new_root_index, current_level_hash);
         self.next_index = _next_index + 1;
 
         Ok(_next_index)
@@ -90,8 +121,10 @@ impl MerkleTree {
         let mut i = current_root_index;
         
         loop {
-            if self.roots.get(&i).is_some() && *self.roots.get(&i).unwrap() == root {
-                return true;
+            if let Some(&stored_root) = self.roots.get(&i) {
+                if stored_root == root {
+                    return true;
+                }
             }
             if i == 0 {
                 i = ROOT_HISTORY_SIZE - 1;
@@ -106,45 +139,40 @@ impl MerkleTree {
     }
 
     pub fn get_last_root(&self) -> u128 {
-        return self.roots.get(&self.current_root_index).unwrap().clone();
+        *self.roots.get(&self.current_root_index).unwrap()
     }
 
     pub fn zeros(i: u8) -> u128 {
+        let hasher = MimcHasher::default();
         let mut result = 0;
         for _ in 0..i {
-            result = Hasher::mimc_sponge(
-                result, 
-                0,
-                u128::from_str("340282366920938463463374607431768211455").expect("Failed to parse field size")
-            );
+            result = hasher.mimc_sponge(result, 0, hasher.field_prime());
         }
         result
     }
 }
 
-impl ToString for MerkleTree {
-    fn to_string(&self) -> String {
-        let mut string_representation = String::new();
+#[allow(deprecated)]
+impl std::fmt::Display for MerkleTree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "levels: {}", self.levels)?;
         
-        string_representation.push_str(&format!("levels: {}\n", self.levels));
-        
-        string_representation.push_str("filled_subtrees:\n");
+        writeln!(f, "filled_subtrees:")?;
         for (level, value) in &self.filled_subtrees {
-            string_representation.push_str(&format!("  {}: {}\n", level, value.to_string()));
+            writeln!(f, "  {}: {}", level, value)?;
         }
         
-        string_representation.push_str("roots:\n");
+        writeln!(f, "roots:")?;
         for (level, value) in &self.roots {
-            string_representation.push_str(&format!("  {}: {}\n", level, value.to_string()));
+            writeln!(f, "  {}: {}", level, value)?;
         }
         
-        string_representation.push_str(&format!("current_root_index: {}\n", self.current_root_index));
-        string_representation.push_str(&format!("next_index: {}\n", self.next_index));
-        
-        string_representation
+        writeln!(f, "current_root_index: {}", self.current_root_index)?;
+        write!(f, "next_index: {}", self.next_index)
     }
 }
 
+#[allow(deprecated)]
 impl FromStr for MerkleTree {
     type Err = SolanaError;
 
@@ -158,8 +186,7 @@ impl FromStr for MerkleTree {
         for line in s.lines() {
             let parts: Vec<&str> = line.trim().splitn(2, ":").collect();
             if parts.len() != 2 {
-                return Err(utils::err("Error").into()
-                );
+                return Err(utils::err("Error"));
             }
             let key = parts[0].trim();
             let value = parts[1].trim();
@@ -171,7 +198,7 @@ impl FromStr for MerkleTree {
                 "filled_subtrees" => {
                     let level_value: Vec<&str> = value.splitn(2, ":").collect();
                     if level_value.len() != 2 {
-                        return Err(utils::err("Error occured in filled subtrees").into());
+                        return Err(utils::err("Error occured in filled subtrees"));
                     }
                     let level: u8 = level_value[0].trim().parse().map_err(|e| format!("Parsing filled_subtrees level failed: {}", e)).unwrap();
                     let value: u128 = level_value[1].trim().parse().map_err(|e| format!("Parsing filled_subtrees value failed: {}", e)).unwrap();
@@ -180,7 +207,7 @@ impl FromStr for MerkleTree {
                 "roots" => {
                     let level_value: Vec<&str> = value.splitn(2, ":").collect();
                     if level_value.len() != 2 {
-                        return Err(utils::err("Error in roots").into());
+                        return Err(utils::err("Error in roots"));
                     }
                     let level: u8 = level_value[0].trim().parse().map_err(|e| format!("Parsing roots level failed: {}", e)).unwrap();
                     let value: u128 = level_value[1].trim().parse().map_err(|e| format!("Parsing roots value failed: {}", e)).unwrap();
@@ -193,21 +220,22 @@ impl FromStr for MerkleTree {
                     next_index = Some(value.parse().map_err(|e| format!("Parsing next_index failed: {}", e)).unwrap());
                 }
                 _ => {
-                    return Err(utils::err("Unexpected error").into());
+                    return Err(utils::err("Unexpected error"));
                 }
             }
         }
 
-        let levels = levels.ok_or("Missing levels").unwrap();
-        let current_root_index = current_root_index.ok_or("Missing current_root_index").unwrap();
-        let next_index = next_index.ok_or("Missing next_index").unwrap();
+        let levels = levels.ok_or_else(|| utils::err("Missing levels")).unwrap();
+        let current_root_index = current_root_index.ok_or_else(|| utils::err("Missing current_root_index")).unwrap();
+        let next_index = next_index.ok_or_else(|| utils::err("Missing next_index")).unwrap();
 
         Ok(MerkleTree {
             levels,
             filled_subtrees,
             roots,
             current_root_index,
-            next_index
+            next_index,
+            hasher: MimcHasher::default(),
         })
     }
 }
@@ -218,6 +246,7 @@ mod tests {
     const MERKLE_TREE_HEIGHT: u8 = 20;
 
     #[test]
+    #[allow(deprecated)]
     fn test_insert() {
         let mut merkle_tree = MerkleTree::new(MERKLE_TREE_HEIGHT);
         let leaf = 123;
@@ -226,6 +255,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_is_known_root() {
         let merkle_tree = MerkleTree::new(MERKLE_TREE_HEIGHT);
         let root = 123;
